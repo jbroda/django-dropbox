@@ -4,6 +4,9 @@ import re
 import urlparse
 import urllib
 import itertools
+import platform
+import logging
+
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -23,7 +26,10 @@ from .settings import (CONSUMER_KEY,
                        ACCESS_TOKEN_SECRET,
                        CACHE_TIMEOUT)
 
+##############################################################################
+logger = logging.getLogger(__name__)
 
+##############################################################################
 class DropboxStorage(Storage):
     """
     A storage class providing access to resources in a Dropbox Public folder.
@@ -35,10 +41,14 @@ class DropboxStorage(Storage):
         self.client = DropboxClient(session)
         self.account_info = self.client.account_info()
         self.location = location
-        self.base_url = 'http://dl.dropbox.com/u/{uid}/'.format(**self.account_info)
+        self.base_url = 'https://dl.dropboxusercontent.com/u/{uid}/'.format(**self.account_info)
 
     def _get_abs_path(self, name):
-        return os.path.realpath(os.path.join(self.location, name))
+        # the path to save in dropbox
+        name = os.path.join(self.location, name)
+        if platform.system() == "Windows":
+            name = name.replace("\\", "/")
+        return name
 
     def _open(self, name, mode='rb'):
         name = self._get_abs_path(name)
@@ -49,11 +59,11 @@ class DropboxStorage(Storage):
         name = self._get_abs_path(name)
         directory = os.path.dirname(name)
         if not self.exists(directory) and directory:
-             self.client.file_create_folder(directory)
+            self.client.file_create_folder(directory)
         response = self.client.metadata(directory)
         if not response['is_dir']:
-             raise IOError("%s exists and is not a directory." % directory)
-        abs_name = os.path.realpath(os.path.join(self.location, name))
+            raise IOError("%s exists and is not a directory." % directory)
+        abs_name = name
         self.client.put_file(abs_name, content)
         return name
 
@@ -68,7 +78,8 @@ class DropboxStorage(Storage):
             if metadata.get('is_deleted'):
                 return False
         except ErrorResponse as e:
-            if e.status == 404: # not found
+            if e.status == 404:
+                # not found
                 return False
             raise e
         return True
@@ -96,14 +107,33 @@ class DropboxStorage(Storage):
         return size
 
     def url(self, name):
-        cache_key = 'django-dropbox-url:%s' % filepath_to_uri(name)
-        url = cache.get(cache_key)
+        if name.startswith(self.location):
+            name = name[len(self.location) + 1:]
+        name = os.path.basename(self.location) + "/" + name
 
-        if not url:
-            url = self.client.share(filepath_to_uri(name), short_url=False)['url'] + '?dl=1'
-            cache.set(cache_key, url, CACHE_TIMEOUT)
+        if self.base_url is None:
+            raise ValueError("This file is not accessible via a URL.")
 
-        return url
+        myurl = urlparse.urljoin(self.base_url, filepath_to_uri(name))
+
+        if "static" not in self.location:
+            # Use a dynamic URL for "non-static" files.
+            try:
+                new_name = "/Public/" + name
+                fp = filepath_to_uri(new_name)
+                cache_key = 'django-dropbox-url:%s' % fp
+                myurl = cache.get(cache_key)
+                if not myurl:
+                    myurl = self.client.share(fp, short_url=False)['url'] + '&raw=1'
+                    cache.set(cache_key, myurl, CACHE_TIMEOUT)
+            except Exception,e:
+                logger.exception(e)
+
+        return myurl
+
+    def path(self, name):
+        path = self.base_url + os.path.basename(self.location) + "/" + name
+        return path
 
     def get_available_name(self, name):
         """
@@ -123,14 +153,15 @@ class DropboxStorage(Storage):
 
         return name
 
+
 class DropboxFile(File):
     def __init__(self, name, storage, mode):
+        self._name = name
         self._storage = storage
         self._mode = mode
         self._is_dirty = False
         self.file = StringIO()
-        self.start_range = 0
-        self._name = name
+        self._is_read = False
 
     @property
     def size(self):
@@ -139,13 +170,17 @@ class DropboxFile(File):
         return self._size
 
     def read(self, num_bytes=None):
-        return self._storage.client.get_file(self._name).read()
+        if not self._is_read:
+            self.file = self._storage.client.get_file(self._name)
+            self._is_read = True
+        return self.file.read(num_bytes)
 
     def write(self, content):
         if 'w' not in self._mode:
             raise AttributeError("File was opened for read-only access.")
         self.file = StringIO(content)
         self._is_dirty = True
+        self._is_read = True
 
     def close(self):
         if self._is_dirty:
