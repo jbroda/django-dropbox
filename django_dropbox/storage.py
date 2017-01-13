@@ -109,6 +109,7 @@ class DropboxStorage(Storage):
     def url(self, name):
         if name.startswith(self.location):
             name = name[len(self.location) + 1:]
+
         name = os.path.basename(self.location) + "/" + name
 
         if self.base_url is None:
@@ -119,12 +120,17 @@ class DropboxStorage(Storage):
         if "static" not in self.location:
             # Use a dynamic URL for "non-static" files.
             try:
-                new_name = "/Public/" + name
+                new_name = os.path.dirname(self.location) + "/" + name
                 fp = filepath_to_uri(new_name)
                 cache_key = 'django-dropbox-url:%s' % fp
                 myurl = cache.get(cache_key)
                 if not myurl:
-                    myurl = self.client.share(fp, short_url=False)['url'] + '&raw=1'
+                    try:
+                        myurl = self.client.share(fp, short_url=False)['url'] + '&raw=1'
+                    except Exception,e:
+                        logger.exception(e)
+                    if myurl is None:
+                        myurl = self.client.media(fp)['url']
                     cache.set(cache_key, myurl, CACHE_TIMEOUT)
             except Exception,e:
                 logger.exception(e)
