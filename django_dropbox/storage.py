@@ -1,6 +1,10 @@
 import os.path
 import re
+import urlparse
+import urllib
 import itertools
+import platform
+import logging
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -16,7 +20,10 @@ from django.utils.encoding import filepath_to_uri
 
 from .settings import ACCESS_TOKEN, CACHE_TIMEOUT, SHARE_LINK_CACHE_TIMEOUT
 
+##############################################################################
+logger = logging.getLogger(__name__)
 
+##############################################################################
 @deconstructible
 class DropboxStorage(Storage):
     """
@@ -85,6 +92,41 @@ class DropboxStorage(Storage):
         return size
 
     def url(self, name):
+        if name.startswith(self.location):
+            name = name[len(self.location) + 1:]
+
+        name = os.path.basename(self.location) + "/" + name
+
+        if self.base_url is None:
+            raise ValueError("This file is not accessible via a URL.")
+
+        myurl = urlparse.urljoin(self.base_url, filepath_to_uri(name))
+
+        if "static" not in self.location:
+            # Use a dynamic URL for "non-static" files.
+            try:
+                new_name = os.path.dirname(self.location) + "/" + name
+                fp = filepath_to_uri(new_name)
+                cache_key = 'django-dropbox-size:{}'.format(fp)
+                myurl = cache.get(cache_key)
+                if not myurl:
+                    try:
+                        shared_link = self.client.sharing_create_shared_link(fp)
+                        myurl = shared_link.url + '&raw=1'
+                        logger.debug("shared link: {0}, myurl: {1}".format(shared_link, myurl))
+                    except Exception,e:
+                        logger.exception(e)
+                    if myurl is None:
+                        temp_link = self.client.files_get_temporary_link(fp)
+                        myurl = temp_link.link
+                        logger.debug("temp link: {0}, myurl: {1}".format(temp_link, myurl))
+                    cache.set(cache_key, myurl, SHARE_LINK_CACHE_TIMEOUT)
+            except Exception,e:
+                logger.exception(e)
+
+        return myurl
+
+        """
         cache_key = 'django-dropbox-size:{}'.format(filepath_to_uri(name))
         url = cache.get(cache_key)
 
@@ -93,6 +135,12 @@ class DropboxStorage(Storage):
             cache.set(cache_key, url, SHARE_LINK_CACHE_TIMEOUT)
 
         return url
+        """
+
+    def path(self, name):
+        path = self.base_url + os.path.basename(self.location) + "/" + name
+        logger.debug('path: {0}'.format(path))
+        return path
 
     def get_available_name(self, name):
         """
