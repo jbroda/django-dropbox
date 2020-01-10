@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{8737fc17-a13b-4987-8839-8e0cbe8f3133}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>setup.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>
+    </InterpreterId>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="requirements.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="django_dropbox\management\commands\get_dropbox_token.py" />
+    <Compile Include="django_dropbox\management\commands\__init__.py" />
+    <Compile Include="django_dropbox\management\__init__.py" />
+    <Compile Include="django_dropbox\models.py" />
+    <Compile Include="django_dropbox\settings.py" />
+    <Compile Include="django_dropbox\storage.py" />
+    <Compile Include="django_dropbox\tests.py" />
+    <Compile Include="django_dropbox\views.py" />
+    <Compile Include="django_dropbox\__init__.py" />
+    <Compile Include="django_dropbox_project\dropbox_testing\admin.py" />
+    <Compile Include="django_dropbox_project\dropbox_testing\models.py" />
+    <Compile Include="django_dropbox_project\dropbox_testing\tests.py" />
+    <Compile Include="django_dropbox_project\dropbox_testing\views.py" />
+    <Compile Include="django_dropbox_project\dropbox_testing\__init__.py" />
+    <Compile Include="django_dropbox_project\manage.py" />
+    <Compile Include="django_dropbox_project\settings.py" />
+    <Compile Include="django_dropbox_project\urls.py" />
+    <Compile Include="django_dropbox_project\__init__.py" />
+    <Compile Include="setup.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="django_dropbox" />
+    <Folder Include="django_dropbox\management" />
+    <Folder Include="django_dropbox\management\commands" />
+    <Folder Include="django_dropbox_project" />
+    <Folder Include="django_dropbox_project\dropbox_testing" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
